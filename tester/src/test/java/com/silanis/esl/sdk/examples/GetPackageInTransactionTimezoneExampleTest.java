@@ -32,7 +32,7 @@ public class GetPackageInTransactionTimezoneExampleTest {
         assertThat(packageInTransactionTimezone.getExpiryDateWithOffset().getOffset(), is(expectedOffset));
         assertThat(packageInTransactionTimezone.getExpiryDateWithOffset().toInstant(), is(packageInUtc.getExpiryDate().toInstant()));
 
-        // The same applies to a page of packages (on an account without the transaction summary setting).
+        // The same applies to a page of packages.
         assertThat(listedPackage, is(notNullValue()));
         assertThat(listedPackage.getExpiryDateWithOffset().getOffset(), is(expectedOffset));
     }
