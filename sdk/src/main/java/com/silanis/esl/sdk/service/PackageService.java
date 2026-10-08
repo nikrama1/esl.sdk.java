@@ -30,6 +30,7 @@ import com.silanis.esl.sdk.PackageId;
 import com.silanis.esl.sdk.PackageStatus;
 import com.silanis.esl.sdk.PackageUpdateWorkflowResult;
 import com.silanis.esl.sdk.Page;
+import com.silanis.esl.sdk.PackageRetrievalOptions;
 import com.silanis.esl.sdk.PageRequest;
 import com.silanis.esl.sdk.ReferencedConditions;
 import com.silanis.esl.sdk.RoleList;
@@ -424,6 +425,30 @@ public class PackageService extends EslComponent {
         return packageConverter(aPackage).toSDKPackage();
     }
 
+    /**
+     * Gets the package, applying the given retrieval options.
+     *
+     * @param packageId The package id
+     * @param options   The retrieval options, e.g. to return the expiration date in the transaction time zone
+     * @return The package
+     */
+    public DocumentPackage getPackage(PackageId packageId, PackageRetrievalOptions options) {
+        return getPackage(packageId, null, options);
+    }
+
+    /**
+     * Gets the package with extensions if provided, applying the given retrieval options.
+     *
+     * @param packageId  The package id
+     * @param extensions A set of extensions
+     * @param options    The retrieval options, e.g. to return the expiration date in the transaction time zone
+     * @return The package
+     */
+    public DocumentPackage getPackage(PackageId packageId, Set<DocumentPackageRequestExtension> extensions, PackageRetrievalOptions options) {
+        Package aPackage = getApiPackage(packageId.getId(), extensions, options);
+        return packageConverter(aPackage).toSDKPackage();
+    }
+
     public List<com.silanis.esl.sdk.Document> getDocuments(PackageId packageId, String signerId) {
         DocumentPackage documentPackage = getPackage(packageId);
         final com.silanis.esl.sdk.DocumentVisibility visibility = getDocumentVisibility(packageId);
@@ -477,16 +502,38 @@ public class PackageService extends EslComponent {
      * @throws EslException in case of an error
      */
     public Package getApiPackage(String packageId, Set<DocumentPackageRequestExtension> extensions) {
+        return getApiPackage(packageId, extensions, null);
+    }
+
+    /**
+     * Retrieves package with extensions if provided, applying the given retrieval options.
+     * @param packageId The package id
+     * @param extensions A set of extensions
+     * @param options The retrieval options
+     * @return The package
+     * @throws EslException in case of an error
+     */
+    public Package getApiPackage(String packageId, Set<DocumentPackageRequestExtension> extensions, PackageRetrievalOptions options) {
+        String path;
         if (extensions == null || extensions.isEmpty()) {
-            return getApiPackage(packageId);
+            path = new UrlTemplate(getBaseUrl()).urlFor(UrlTemplate.PACKAGE_ID_PATH)
+                    .replace(PACKAGE_ID_PATH_PARAM, packageId)
+                    .build();
+        } else {
+            path = new UrlTemplate(getBaseUrl()).urlFor(UrlTemplate.PACKAGE_ID_WITH_EXTENSIONS_PATH)
+                    .replace(PACKAGE_ID_PATH_PARAM, packageId)
+                    .replace("{extensions}", StringUtils.join(extensions.stream().map(DocumentPackageRequestExtension::getValue).toArray(), ","))
+                    .build();
         }
 
-        String path = new UrlTemplate(getBaseUrl()).urlFor(UrlTemplate.PACKAGE_ID_WITH_EXTENSIONS_PATH)
-                .replace(PACKAGE_ID_PATH_PARAM, packageId)
-                .replace("{extensions}", StringUtils.join(extensions.stream().map(DocumentPackageRequestExtension::getValue).toArray(), ","))
-                .build();
+        return getApiPackageWithPath(withRetrievalOptions(path, options));
+    }
 
-        return getApiPackageWithPath(path);
+    private String withRetrievalOptions(String path, PackageRetrievalOptions options) {
+        if (options == null || !options.isUseTransactionTimezone()) {
+            return path;
+        }
+        return path + (path.contains("?") ? "&" : "?") + "useTransactionTimezone=true";
     }
 
     /**
@@ -1143,6 +1190,18 @@ public class PackageService extends EslComponent {
      * @return List of DocumentPackages that populate the specified page
      */
     public com.silanis.esl.sdk.Page<DocumentPackage> getPackages(String status, PageRequest request) {
+        return getPackages(status, request, null);
+    }
+
+    /**
+     * Returns a Page of DocumentPackages, applying the given retrieval options.
+     *
+     * @param status  Returned DocumentPackages must have their status set to this value to be included in the result set
+     * @param request Identifying which page of results to return
+     * @param options The retrieval options, e.g. to return the expiration date in the transaction time zone
+     * @return List of DocumentPackages that populate the specified page
+     */
+    public com.silanis.esl.sdk.Page<DocumentPackage> getPackages(String status, PageRequest request, PackageRetrievalOptions options) {
         String path = new UrlTemplate(getBaseUrl()).urlFor(UrlTemplate.PACKAGE_LIST_PATH)
                 .replace("{status}", status)
                 .replace("{from}", Integer.toString(request.getFrom()))
@@ -1150,7 +1209,7 @@ public class PackageService extends EslComponent {
                 .build();
 
         try {
-            String response = getClient().get(path);
+            String response = getClient().get(withRetrievalOptions(path, options));
             Result<Package> results = JacksonUtil.deserialize(response, new TypeReference<Result<Package>>() {
             });
             return convertToPage(results, request);
@@ -1200,6 +1259,20 @@ public class PackageService extends EslComponent {
      * @return List of DocumentPackages that populate the specified page
      */
     public com.silanis.esl.sdk.Page<DocumentPackage> getUpdatedPackagesWithinDateRange(PackageStatus status, PageRequest request, Date from, Date to) {
+        return getUpdatedPackagesWithinDateRange(status, request, from, to, null);
+    }
+
+    /**
+     * Returns a Page of DocumentPackages, that last updated in time range, applying the given retrieval options.
+     *
+     * @param status  Returned DocumentPackages must have their status set to this value to be included in the result set
+     * @param request Identifying which page of results to return
+     * @param from Date range starting from this date included
+     * @param to Date range ending of this date included
+     * @param options The retrieval options, e.g. to return the expiration date in the transaction time zone
+     * @return List of DocumentPackages that populate the specified page
+     */
+    public com.silanis.esl.sdk.Page<DocumentPackage> getUpdatedPackagesWithinDateRange(PackageStatus status, PageRequest request, Date from, Date to, PackageRetrievalOptions options) {
         String fromDate = DateHelper.dateToIsoUtcFormat(from);
         String toDate = DateHelper.dateToIsoUtcFormat(to);
 
@@ -1212,7 +1285,7 @@ public class PackageService extends EslComponent {
                 .build();
 
         try {
-            String response = getClient().get(path);
+            String response = getClient().get(withRetrievalOptions(path, options));
             Result<Package> results = JacksonUtil.deserialize(response, new TypeReference<Result<Package>>() {
             });
             return convertToPage(results, request);

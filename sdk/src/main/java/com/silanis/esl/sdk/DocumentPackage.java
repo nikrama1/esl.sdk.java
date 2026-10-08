@@ -3,6 +3,7 @@ package com.silanis.esl.sdk;
 import org.apache.commons.lang3.StringUtils;
 
 import java.io.Serializable;
+import java.time.OffsetDateTime;
 import java.util.*;
 
 /**
@@ -21,6 +22,7 @@ public class DocumentPackage implements Serializable {
     private String name;
     private String description;
     private Date expiryDate;
+    private OffsetDateTime expiryDateWithOffset;
     private Date updatedDate;
     private Date createdDate;
     private String packageMessage;
@@ -255,6 +257,23 @@ public class DocumentPackage implements Serializable {
 
     public Date getExpiryDate() {
         return expiryDate;
+    }
+
+    public void setExpiryDateWithOffset( OffsetDateTime expiryDateWithOffset ) {
+        this.expiryDateWithOffset = expiryDateWithOffset;
+    }
+
+    /**
+     * Returns the expiration date with the UTC offset of the transaction time zone.
+     * <p>
+     * Only set when the package was retrieved with
+     * {@link com.silanis.esl.sdk.builder.PackageRetrievalOptionsBuilder#withTransactionTimezone()};
+     * otherwise null, and {@link #getExpiryDate()} should be used.
+     *
+     * @return the expiration date with its offset, e.g. 2026-10-10T19:28:47+03:30
+     */
+    public OffsetDateTime getExpiryDateWithOffset() {
+        return expiryDateWithOffset;
     }
 
     public void setUpdatedDate(Date updatedDate) {
