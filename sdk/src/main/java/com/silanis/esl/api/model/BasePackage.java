@@ -221,13 +221,13 @@ public class BasePackage extends Entity
     }
 
     @JsonProperty(FIELD_DUE)
-    protected void setDueFromJson( String value ){
+    protected void setDueFromJson(String value){
         try {
-            setDue( value == null ? null : JsonDateDeserializer.extractIso8061Date( value));
-        } catch ( ParseException e ){
-            throw new IllegalArgumentException( "Invalid due date: " + value, e);
+            setDue(value == null ? null : JsonDateDeserializer.extractIso8061Date(value));
+        } catch (ParseException e){
+            throw new IllegalArgumentException("Invalid due date: " + value, e);
         }
-        this._dueWithOffset = JsonDateDeserializer.extractIso8061OffsetDateTime( value);
+        this._dueWithOffset = JsonDateDeserializer.extractIso8061OffsetDateTime(value);
     }
 
     /**

@@ -18,7 +18,7 @@ import com.fasterxml.jackson.databind.DeserializationContext;
 public class JsonDateDeserializer extends JsonDeserializer<Date> {
 
     private final static String ISO_8061 = "yyyy-MM-dd'T'HH:mm:ss";
-    private final static Pattern OFFSET_SUFFIX = Pattern.compile( "[+-]\\d{2}:\\d{2}$");
+    private final static Pattern OFFSET_SUFFIX = Pattern.compile("[+-]\\d{2}:\\d{2}$");
 
     /** Use ConverterUtil.java **/
     public static String asIso8061( Date date){
@@ -38,21 +38,21 @@ public class JsonDateDeserializer extends JsonDeserializer<Date> {
      * or null when it is in UTC ("Z") or has no zone at all.
      */
     public static OffsetDateTime extractIso8061OffsetDateTime(String strValue) {
-        if ( strValue == null || !OFFSET_SUFFIX.matcher(strValue).find()){
+        if (strValue == null || !OFFSET_SUFFIX.matcher(strValue).find()){
             return null;
         }
         try {
-            return OffsetDateTime.parse( strValue, DateTimeFormatter.ISO_OFFSET_DATE_TIME);
-        } catch ( DateTimeParseException e){
+            return OffsetDateTime.parse(strValue, DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+        } catch (DateTimeParseException e){
             return null;
         }
     }
 
     /** Use ConverterUtil.java **/
     public static Date extractIso8061Date(String strValue) throws ParseException {
-        OffsetDateTime withOffset = extractIso8061OffsetDateTime( strValue);
-        if ( withOffset != null){
-            return Date.from( withOffset.toInstant());
+        OffsetDateTime withOffset = extractIso8061OffsetDateTime(strValue);
+        if (withOffset != null){
+            return Date.from(withOffset.toInstant());
         }
 
         SimpleDateFormat dateParser = new SimpleDateFormat(ISO_8061);

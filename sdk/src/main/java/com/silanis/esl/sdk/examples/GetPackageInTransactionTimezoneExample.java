@@ -22,9 +22,6 @@ import static org.joda.time.DateTime.now;
  * <p>
  * By default the expiration date is returned in UTC. With the transaction time zone option, it is also
  * available with the offset of the package time zone through {@link DocumentPackage#getExpiryDateWithOffset()}.
- * <p>
- * When the account has the transaction summary setting enabled, a page of packages still returns the
- * expiration date in UTC.
  */
 public class GetPackageInTransactionTimezoneExample extends SDKSample {
 
