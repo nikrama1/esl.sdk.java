@@ -1230,6 +1230,19 @@ public class PackageService extends EslComponent {
      * @return List of Map&lt;String, String&gt; that populate the specified page which contains fields and their values
      */
     public com.silanis.esl.sdk.Page<Map<String, String>> getPackagesFields(PackageStatus status, PageRequest request, Set<String> fields) {
+        return getPackagesFields(status, request, fields, null);
+    }
+
+    /**
+     * Returns a Page of Map, which contains package fields and their values, applying the given retrieval options.
+     *
+     * @param status  Packages must have their status set to this value to be included in the result set
+     * @param request Identifying which page of results to return
+     * @param fields Identifying which package fields to return
+     * @param options The retrieval options, e.g. to return the expiration date in the transaction time zone
+     * @return List of Map&lt;String, String&gt; that populate the specified page which contains fields and their values
+     */
+    public com.silanis.esl.sdk.Page<Map<String, String>> getPackagesFields(PackageStatus status, PageRequest request, Set<String> fields, PackageRetrievalOptions options) {
         String path = new UrlTemplate(getBaseUrl()).urlFor(UrlTemplate.PACKAGE_FIELDS_LIST_PATH)
                 .replace("{status}", new PackageStatusConverter(status).toAPIPackageStatus())
                 .replace("{from}", Integer.toString(request.getFrom()))
@@ -1237,7 +1250,7 @@ public class PackageService extends EslComponent {
                 .replace("{fields}", StringUtils.join(fields, ","))
                 .build();
         try {
-            String response = getClient().get(path);
+            String response = getClient().get(withRetrievalOptions(path, options));
             Result<Map<String, String>> results = JacksonUtil.deserialize(response, new TypeReference<Result<Map<String, String>>>() {
             });
             return new com.silanis.esl.sdk.Page<Map<String, String>>(results.getResults(), results.getCount(), request);
@@ -1476,24 +1489,30 @@ public class PackageService extends EslComponent {
     }
 
     public com.silanis.esl.sdk.Page<DocumentPackage> getTemplates(PageRequest request) {
-        String path = new UrlTemplate(getBaseUrl()).urlFor(UrlTemplate.PACKAGE_PATH)
-                .addParam("type", "template")
-                .addParam("from", Integer.toString(request.getFrom()))
-                .addParam("to", Integer.toString(request.to()))
-                .build();
-
-        return getTemplates(request, path);
+        return getTemplates(request, null, null);
     }
 
     public com.silanis.esl.sdk.Page<DocumentPackage> getTemplates(PageRequest request, Visibility visibility) {
+        return getTemplates(request, visibility, null);
+    }
+
+    /**
+     * Returns a Page of templates, applying the given retrieval options.
+     *
+     * @param request    Identifying which page of results to return
+     * @param visibility Returned templates must have this visibility to be included in the result set, or null for any visibility
+     * @param options    The retrieval options, e.g. to return the expiration date in the transaction time zone
+     * @return List of templates that populate the specified page
+     */
+    public com.silanis.esl.sdk.Page<DocumentPackage> getTemplates(PageRequest request, Visibility visibility, PackageRetrievalOptions options) {
         String path = new UrlTemplate(getBaseUrl()).urlFor(UrlTemplate.PACKAGE_PATH)
                 .addParam("type", "template")
                 .addParam("from", Integer.toString(request.getFrom()))
                 .addParam("to", Integer.toString(request.to()))
-                .addParam("visibility", visibility.name())
+                .addParam("visibility", visibility == null ? null : visibility.name())
                 .build();
 
-        return getTemplates(request, path);
+        return getTemplates(request, withRetrievalOptions(path, options));
     }
 
     private Page<DocumentPackage> getTemplates(PageRequest request, String path) {
