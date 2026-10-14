@@ -831,6 +831,77 @@ public class PackageServiceTest {
     }
 
     @Test
+    public void testGetPackagesFieldsWithTransactionTimezone() throws Exception {
+        PageRequest request = new PageRequest(1, 5);
+        String expectedPath = new UrlTemplate("http://baseurl").urlFor(UrlTemplate.PACKAGE_FIELDS_LIST_PATH)
+                .replace("{status}", "SENT")
+                .replace("{from}", "1")
+                .replace("{to}", "5")
+                .replace("{fields}", "due")
+                .build() + "&useTransactionTimezone=true";
+        when(clientMock.get(expectedPath))
+                .thenReturn("{\"results\":[{\"due\":\"2026-10-10T19:28:47+03:30\"}],\"count\":1}");
+
+        Page<Map<String, String>> page = packageService.getPackagesFields(PackageStatus.SENT, request,
+                Collections.singleton("due"), newPackageRetrievalOptions().withTransactionTimezone().build());
+
+        assertEquals("2026-10-10T19:28:47+03:30", page.iterator().next().get("due"));
+    }
+
+    @Test
+    public void testGetTemplatesWithTransactionTimezoneReturnsExpiryDateWithOffset() throws Exception {
+        when(clientMock.get(anyString()))
+                .thenReturn("{\"results\":[" + packageJsonWithDue("tpl1", "2026-10-10T19:28:47+03:30") + "],\"count\":1}");
+
+        Page<DocumentPackage> page = packageService.getTemplates(new PageRequest(1, 5), null,
+                newPackageRetrievalOptions().withTransactionTimezone().build());
+
+        ArgumentCaptor<String> path = ArgumentCaptor.forClass(String.class);
+        verify(clientMock).get(path.capture());
+        assertTrue(path.getValue().contains("type=template"));
+        assertFalse(path.getValue().contains("visibility="));
+        assertTrue(path.getValue().endsWith("&useTransactionTimezone=true"));
+        assertEquals(OffsetDateTime.of(2026, 10, 10, 19, 28, 47, 0, ZoneOffset.ofHoursMinutes(3, 30)),
+                page.iterator().next().getExpiryDateWithOffset());
+    }
+
+    @Test
+    public void testGetTemplatesWithVisibilityAndTransactionTimezone() throws Exception {
+        when(clientMock.get(anyString())).thenReturn("{\"results\":[],\"count\":0}");
+
+        packageService.getTemplates(new PageRequest(1, 5), Visibility.SENDER,
+                newPackageRetrievalOptions().withTransactionTimezone().build());
+
+        ArgumentCaptor<String> path = ArgumentCaptor.forClass(String.class);
+        verify(clientMock).get(path.capture());
+        assertTrue(path.getValue().contains("visibility=SENDER"));
+        assertTrue(path.getValue().endsWith("&useTransactionTimezone=true"));
+    }
+
+    @Test
+    public void testGetTemplatesWithoutOptionsDoesNotSendTransactionTimezone() throws Exception {
+        when(clientMock.get(anyString())).thenReturn("{\"results\":[],\"count\":0}");
+
+        packageService.getTemplates(new PageRequest(1, 5));
+
+        ArgumentCaptor<String> path = ArgumentCaptor.forClass(String.class);
+        verify(clientMock).get(path.capture());
+        assertFalse(path.getValue().contains("useTransactionTimezone"));
+    }
+
+    @Test
+    public void testGetTemplatesWithNullVisibilityDoesNotSendVisibility() throws Exception {
+        when(clientMock.get(anyString())).thenReturn("{\"results\":[],\"count\":0}");
+
+        packageService.getTemplates(new PageRequest(1, 5), null);
+
+        ArgumentCaptor<String> path = ArgumentCaptor.forClass(String.class);
+        verify(clientMock).get(path.capture());
+        assertTrue(path.getValue().contains("type=template"));
+        assertFalse(path.getValue().contains("visibility="));
+    }
+
+    @Test
     public void testPackageSerializationKeepsDueInUtc() {
         Package apiPackage = Serialization.fromJson(packageJsonWithDue("pkg1", "2026-10-10T19:28:47+03:30"), Package.class);
 
