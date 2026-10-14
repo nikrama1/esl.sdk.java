@@ -651,6 +651,15 @@ public class EslClient {
         return packageService.getPackage(packageId);
     }
 
+    /**
+     * @param packageId The document package identifier
+     * @param options   The retrieval options, e.g. to return the expiration date in the transaction time zone
+     * @return the document package with the given packageId
+     */
+    public DocumentPackage getPackage(PackageId packageId, PackageRetrievalOptions options) {
+        return packageService.getPackage(packageId, options);
+    }
+
     public DocumentPackage getPackageWithExtensions(PackageId packageId, DocumentPackageRequestExtension... extensions) {
         return packageService.getPackage(packageId, new HashSet<>(Arrays.asList(extensions)));
     }

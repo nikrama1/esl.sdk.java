@@ -1,5 +1,6 @@
 package com.silanis.esl.sdk;
 
+import static com.silanis.esl.sdk.builder.PackageRetrievalOptionsBuilder.newPackageRetrievalOptions;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -15,7 +16,11 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -25,6 +30,7 @@ import java.util.Map;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 
@@ -749,6 +755,170 @@ public class PackageServiceTest {
 
         assertFalse(result.hasOverlaps());
         assertTrue(result.getOverlaps().isEmpty());
+    }
+
+    @Test
+    public void testGetPackageWithTransactionTimezoneReturnsExpiryDateWithOffset() throws Exception {
+        String packageUid = "pkg1";
+        when(clientMock.get(buildPackagePath(packageUid) + "?useTransactionTimezone=true"))
+                .thenReturn(packageJsonWithDue(packageUid, "2026-10-10T19:28:47+03:30"));
+
+        DocumentPackage documentPackage = packageService.getPackage(new PackageId(packageUid),
+                newPackageRetrievalOptions().withTransactionTimezone().build());
+
+        assertEquals(OffsetDateTime.of(2026, 10, 10, 19, 28, 47, 0, ZoneOffset.ofHoursMinutes(3, 30)),
+                documentPackage.getExpiryDateWithOffset());
+        assertEquals(Instant.parse("2026-10-10T15:58:47Z"), documentPackage.getExpiryDate().toInstant());
+    }
+
+    @Test
+    public void testGetPackageWithoutTransactionTimezoneKeepsUtcExpiryDate() throws Exception {
+        String packageUid = "pkg1";
+        when(clientMock.get(buildPackagePath(packageUid)))
+                .thenReturn(packageJsonWithDue(packageUid, "2026-10-10T15:58:47Z"));
+
+        DocumentPackage documentPackage = packageService.getPackage(new PackageId(packageUid),
+                newPackageRetrievalOptions().build());
+
+        assertNull(documentPackage.getExpiryDateWithOffset());
+        assertEquals(Instant.parse("2026-10-10T15:58:47Z"), documentPackage.getExpiryDate().toInstant());
+    }
+
+    @Test
+    public void testGetPackageWithExtensionsAndTransactionTimezone() throws Exception {
+        String packageUid = "pkg1";
+        String expectedPath = new UrlTemplate("http://baseurl").urlFor(UrlTemplate.PACKAGE_ID_WITH_EXTENSIONS_PATH)
+                .replace("{packageId}", packageUid)
+                .replace("{extensions}", DocumentPackageRequestExtension.values()[0].getValue())
+                .build() + "&useTransactionTimezone=true";
+        when(clientMock.get(expectedPath)).thenReturn(packageJsonWithDue(packageUid, "2026-10-10T19:28:47+03:30"));
+
+        DocumentPackage documentPackage = packageService.getPackage(new PackageId(packageUid),
+                Collections.singleton(DocumentPackageRequestExtension.values()[0]),
+                newPackageRetrievalOptions().withTransactionTimezone().build());
+
+        assertEquals(ZoneOffset.ofHoursMinutes(3, 30), documentPackage.getExpiryDateWithOffset().getOffset());
+    }
+
+    @Test
+    public void testGetPackagesWithTransactionTimezoneReturnsExpiryDateWithOffset() throws Exception {
+        PageRequest request = new PageRequest(1, 5);
+        String expectedPath = new UrlTemplate("http://baseurl").urlFor(UrlTemplate.PACKAGE_LIST_PATH)
+                .replace("{status}", "SENT")
+                .replace("{from}", "1")
+                .replace("{to}", "5")
+                .build() + "&useTransactionTimezone=true";
+        when(clientMock.get(expectedPath))
+                .thenReturn("{\"results\":[" + packageJsonWithDue("pkg1", "2026-10-10T19:28:47+03:30") + "],\"count\":1}");
+
+        Page<DocumentPackage> page = packageService.getPackages("SENT", request,
+                newPackageRetrievalOptions().withTransactionTimezone().build());
+
+        assertEquals(OffsetDateTime.of(2026, 10, 10, 19, 28, 47, 0, ZoneOffset.ofHoursMinutes(3, 30)),
+                page.iterator().next().getExpiryDateWithOffset());
+    }
+
+    @Test
+    public void testGetUpdatedPackagesWithinDateRangeWithTransactionTimezone() throws Exception {
+        when(clientMock.get(anyString())).thenReturn("{\"results\":[],\"count\":0}");
+
+        packageService.getUpdatedPackagesWithinDateRange(PackageStatus.SENT, new PageRequest(1, 5), new Date(), new Date(),
+                newPackageRetrievalOptions().withTransactionTimezone().build());
+
+        ArgumentCaptor<String> path = ArgumentCaptor.forClass(String.class);
+        verify(clientMock).get(path.capture());
+        assertTrue(path.getValue().endsWith("&useTransactionTimezone=true"));
+    }
+
+    @Test
+    public void testGetPackagesFieldsWithTransactionTimezone() throws Exception {
+        PageRequest request = new PageRequest(1, 5);
+        String expectedPath = new UrlTemplate("http://baseurl").urlFor(UrlTemplate.PACKAGE_FIELDS_LIST_PATH)
+                .replace("{status}", "SENT")
+                .replace("{from}", "1")
+                .replace("{to}", "5")
+                .replace("{fields}", "due")
+                .build() + "&useTransactionTimezone=true";
+        when(clientMock.get(expectedPath))
+                .thenReturn("{\"results\":[{\"due\":\"2026-10-10T19:28:47+03:30\"}],\"count\":1}");
+
+        Page<Map<String, String>> page = packageService.getPackagesFields(PackageStatus.SENT, request,
+                Collections.singleton("due"), newPackageRetrievalOptions().withTransactionTimezone().build());
+
+        assertEquals("2026-10-10T19:28:47+03:30", page.iterator().next().get("due"));
+    }
+
+    @Test
+    public void testGetTemplatesWithTransactionTimezoneReturnsExpiryDateWithOffset() throws Exception {
+        when(clientMock.get(anyString()))
+                .thenReturn("{\"results\":[" + packageJsonWithDue("tpl1", "2026-10-10T19:28:47+03:30") + "],\"count\":1}");
+
+        Page<DocumentPackage> page = packageService.getTemplates(new PageRequest(1, 5), null,
+                newPackageRetrievalOptions().withTransactionTimezone().build());
+
+        ArgumentCaptor<String> path = ArgumentCaptor.forClass(String.class);
+        verify(clientMock).get(path.capture());
+        assertTrue(path.getValue().contains("type=template"));
+        assertFalse(path.getValue().contains("visibility="));
+        assertTrue(path.getValue().endsWith("&useTransactionTimezone=true"));
+        assertEquals(OffsetDateTime.of(2026, 10, 10, 19, 28, 47, 0, ZoneOffset.ofHoursMinutes(3, 30)),
+                page.iterator().next().getExpiryDateWithOffset());
+    }
+
+    @Test
+    public void testGetTemplatesWithVisibilityAndTransactionTimezone() throws Exception {
+        when(clientMock.get(anyString())).thenReturn("{\"results\":[],\"count\":0}");
+
+        packageService.getTemplates(new PageRequest(1, 5), Visibility.SENDER,
+                newPackageRetrievalOptions().withTransactionTimezone().build());
+
+        ArgumentCaptor<String> path = ArgumentCaptor.forClass(String.class);
+        verify(clientMock).get(path.capture());
+        assertTrue(path.getValue().contains("visibility=SENDER"));
+        assertTrue(path.getValue().endsWith("&useTransactionTimezone=true"));
+    }
+
+    @Test
+    public void testGetTemplatesWithoutOptionsDoesNotSendTransactionTimezone() throws Exception {
+        when(clientMock.get(anyString())).thenReturn("{\"results\":[],\"count\":0}");
+
+        packageService.getTemplates(new PageRequest(1, 5));
+
+        ArgumentCaptor<String> path = ArgumentCaptor.forClass(String.class);
+        verify(clientMock).get(path.capture());
+        assertFalse(path.getValue().contains("useTransactionTimezone"));
+    }
+
+    @Test
+    public void testGetTemplatesWithNullVisibilityDoesNotSendVisibility() throws Exception {
+        when(clientMock.get(anyString())).thenReturn("{\"results\":[],\"count\":0}");
+
+        packageService.getTemplates(new PageRequest(1, 5), null);
+
+        ArgumentCaptor<String> path = ArgumentCaptor.forClass(String.class);
+        verify(clientMock).get(path.capture());
+        assertTrue(path.getValue().contains("type=template"));
+        assertFalse(path.getValue().contains("visibility="));
+    }
+
+    @Test
+    public void testPackageSerializationKeepsDueInUtc() {
+        Package apiPackage = Serialization.fromJson(packageJsonWithDue("pkg1", "2026-10-10T19:28:47+03:30"), Package.class);
+
+        assertTrue(Serialization.toJson(apiPackage).contains("\"due\":\"2026-10-10T15:58:47Z\""));
+    }
+
+    @Test
+    public void testSetDueClearsOffsetFromServer() {
+        Package apiPackage = Serialization.fromJson(packageJsonWithDue("pkg1", "2026-10-10T19:28:47+03:30"), Package.class);
+
+        apiPackage.setDue(new Date());
+
+        assertNull(apiPackage.getDueWithOffset());
+    }
+
+    private String packageJsonWithDue(String packageUid, String due) {
+        return "{\"id\":\"" + packageUid + "\",\"name\":\"Test Package\",\"due\":\"" + due + "\",\"timezoneId\":\"Asia/Tehran\"}";
     }
 
     private String toApiPackageJson(String packageUid, String language) {
