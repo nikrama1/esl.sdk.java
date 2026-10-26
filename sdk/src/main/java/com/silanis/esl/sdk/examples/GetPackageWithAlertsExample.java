@@ -8,6 +8,11 @@ import static org.joda.time.DateMidnight.now;
 import com.silanis.esl.sdk.DocumentPackage;
 import com.silanis.esl.sdk.DocumentPackageRequestExtension;
 import com.silanis.esl.sdk.NotificationMethod;
+import com.silanis.esl.sdk.PackageQueryParam;
+
+import java.util.Collections;
+import java.util.EnumMap;
+import java.util.Map;
 
 /**
  * Creates and retrieves a package which might have alerts associated with it.
@@ -37,6 +42,8 @@ public class GetPackageWithAlertsExample extends SDKSample {
                 .build();
 
         packageId = eslClient.createPackage(aPackage);
-        retrievedPackage = eslClient.getPackageWithExtensions(packageId, DocumentPackageRequestExtension.ALERTS);
+        Map<PackageQueryParam, Object> params = new EnumMap<>(PackageQueryParam.class);
+        params.put(PackageQueryParam.EXTENSIONS, Collections.singleton(DocumentPackageRequestExtension.ALERTS));
+        retrievedPackage = eslClient.getPackage(packageId, params);
     }
 }

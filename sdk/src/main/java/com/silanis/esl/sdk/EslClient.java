@@ -651,6 +651,20 @@ public class EslClient {
         return packageService.getPackage(packageId);
     }
 
+    /**
+     * @param packageId The document package identifier
+     * @param params    The query parameters, e.g. {@link PackageQueryParam#USE_TRANSACTION_TIMEZONE} to return the
+     *                  expiration date in the transaction time zone. Parameters with a null or blank value are not sent.
+     * @return the document package with the given packageId
+     */
+    public DocumentPackage getPackage(PackageId packageId, Map<PackageQueryParam, Object> params) {
+        return packageService.getPackage(packageId, params);
+    }
+
+    /**
+     * @deprecated Please use {@link #getPackage(PackageId, Map)} with {@link PackageQueryParam#EXTENSIONS} instead.
+     */
+    @Deprecated
     public DocumentPackage getPackageWithExtensions(PackageId packageId, DocumentPackageRequestExtension... extensions) {
         return packageService.getPackage(packageId, new HashSet<>(Arrays.asList(extensions)));
     }

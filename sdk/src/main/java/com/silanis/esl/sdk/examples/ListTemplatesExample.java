@@ -3,6 +3,7 @@ package com.silanis.esl.sdk.examples;
 import com.silanis.esl.sdk.DocumentPackage;
 import com.silanis.esl.sdk.DocumentType;
 import com.silanis.esl.sdk.ExtractionType;
+import com.silanis.esl.sdk.PackageListQueryParam;
 import com.silanis.esl.sdk.PackageId;
 import com.silanis.esl.sdk.Page;
 import com.silanis.esl.sdk.PageRequest;
@@ -10,7 +11,9 @@ import com.silanis.esl.sdk.Visibility;
 
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 
 import static com.silanis.esl.sdk.builder.DocumentBuilder.newDocumentWithName;
 import static com.silanis.esl.sdk.builder.PackageBuilder.newPackageNamed;
@@ -71,7 +74,10 @@ public class ListTemplatesExample extends SDKSample {
 
         templateId = eslClient.getTemplateService().createTemplate(superDuperTemplate);
 
-        templatesPage = eslClient.getPackageService().getTemplates(new PageRequest(0), Visibility.SENDER);
+        Map<PackageListQueryParam, Object> params = new EnumMap<>(PackageListQueryParam.class);
+        params.put(PackageListQueryParam.TYPE, "template");
+        params.put(PackageListQueryParam.VISIBILITY, Visibility.SENDER);
+        templatesPage = eslClient.getPackageService().getPackages(new PageRequest(0), params);
         templates.addAll(templatesPage.getResults());
     }
 

@@ -5,18 +5,26 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.Date;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -25,6 +33,7 @@ import java.util.Map;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
 
@@ -749,6 +758,189 @@ public class PackageServiceTest {
 
         assertFalse(result.hasOverlaps());
         assertTrue(result.getOverlaps().isEmpty());
+    }
+
+    @Test
+    public void testGetPackageWithNullOrEmptyParamsSendsNoQueryString() throws Exception {
+        when(clientMock.get("http://baseurl/packages/pkg1")).thenReturn(packageJsonWithDue("pkg1", "2026-10-10T15:58:47Z"));
+
+        packageService.getPackage(new PackageId("pkg1"), (Map<PackageQueryParam, Object>) null);
+        packageService.getPackage(new PackageId("pkg1"), new EnumMap<PackageQueryParam, Object>(PackageQueryParam.class));
+
+        verify(clientMock, times(2)).get("http://baseurl/packages/pkg1");
+    }
+
+    @Test
+    public void testGetPackageWithTransactionTimezoneReturnsExpiryDateWithOffset() throws Exception {
+        when(clientMock.get("http://baseurl/packages/pkg1?useTransactionTimezone=true"))
+                .thenReturn(packageJsonWithDue("pkg1", "2026-10-10T19:28:47+03:30"));
+        Map<PackageQueryParam, Object> params = new EnumMap<>(PackageQueryParam.class);
+        params.put(PackageQueryParam.USE_TRANSACTION_TIMEZONE, true);
+
+        DocumentPackage documentPackage = packageService.getPackage(new PackageId("pkg1"), params);
+
+        assertEquals(OffsetDateTime.of(2026, 10, 10, 19, 28, 47, 0, ZoneOffset.ofHoursMinutes(3, 30)),
+                documentPackage.getExpiryDateWithOffset());
+        assertEquals(Instant.parse("2026-10-10T15:58:47Z"), documentPackage.getExpiryDate().toInstant());
+    }
+
+    @Test
+    public void testGetPackageWithoutTransactionTimezoneKeepsUtcExpiryDate() throws Exception {
+        when(clientMock.get("http://baseurl/packages/pkg1")).thenReturn(packageJsonWithDue("pkg1", "2026-10-10T15:58:47Z"));
+
+        DocumentPackage documentPackage = packageService.getPackage(new PackageId("pkg1"));
+
+        assertNull(documentPackage.getExpiryDateWithOffset());
+        assertEquals(Instant.parse("2026-10-10T15:58:47Z"), documentPackage.getExpiryDate().toInstant());
+    }
+
+    @Test
+    public void testGetPackageSendsAllParamsAndSkipsNullValues() throws Exception {
+        when(clientMock.get(anyString())).thenReturn(packageJsonWithDue("pkg1", "2026-10-10T15:58:47Z"));
+        Map<PackageQueryParam, Object> params = new EnumMap<>(PackageQueryParam.class);
+        params.put(PackageQueryParam.USE_TRANSACTION_TIMEZONE, true);
+        params.put(PackageQueryParam.EXTENSIONS, Collections.singleton(DocumentPackageRequestExtension.ALERTS));
+        params.put(PackageQueryParam.RAW_SIGNATURE_CAPTURE, null);
+
+        packageService.getPackage(new PackageId("pkg1"), params);
+
+        verifyGetUrlIgnoringParamOrder("http://baseurl/packages/pkg1?extensions=alerts&useTransactionTimezone=true");
+    }
+
+    @Test
+    public void testGetPackageJoinsExtensionValuesWithComma() throws Exception {
+        when(clientMock.get(anyString())).thenReturn(packageJsonWithDue("pkg1", "2026-10-10T15:58:47Z"));
+        Map<PackageQueryParam, Object> params = new EnumMap<>(PackageQueryParam.class);
+        params.put(PackageQueryParam.EXTENSIONS, Arrays.asList("alerts", "other"));
+        params.put(PackageQueryParam.RAW_SIGNATURE_CAPTURE, true);
+
+        packageService.getPackage(new PackageId("pkg1"), params);
+
+        verifyGetUrlIgnoringParamOrder("http://baseurl/packages/pkg1?rawSignatureCapture=true&extensions=alerts%2Cother");
+    }
+
+    @Test
+    public void testGetPackagesSendsPageBoundsAndConvertsValues() throws Exception {
+        when(clientMock.get(anyString()))
+                .thenReturn("{\"results\":[" + packageJsonWithDue("pkg1", "2026-10-10T19:28:47+03:30") + "],\"count\":1}");
+        Map<PackageListQueryParam, Object> params = new EnumMap<>(PackageListQueryParam.class);
+        params.put(PackageListQueryParam.QUERY, PackageStatus.SENT);
+        params.put(PackageListQueryParam.SEARCH, "John Smith+1");
+        params.put(PackageListQueryParam.VISIBILITY, Visibility.SENDER);
+        params.put(PackageListQueryParam.START_DATE, Date.from(Instant.parse("2026-10-01T10:00:00Z")));
+        params.put(PackageListQueryParam.OWNER_EMAIL, "  ");
+        params.put(PackageListQueryParam.USE_TRANSACTION_TIMEZONE, true);
+
+        Page<DocumentPackage> page = packageService.getPackages(new PageRequest(1, 5), params);
+
+        verifyGetUrlIgnoringParamOrder("http://baseurl/packages?from=1&to=5&query=SENT&search=John+Smith%2B1&visibility=SENDER"
+                + "&startDate=2026-10-01T10%3A00%3A00Z&useTransactionTimezone=true");
+        assertEquals(ZoneOffset.ofHoursMinutes(3, 30), page.iterator().next().getExpiryDateWithOffset().getOffset());
+    }
+
+    @Test
+    public void testGetPackagesWithNullParamsSendsOnlyPageBounds() throws Exception {
+        when(clientMock.get(anyString())).thenReturn("{\"results\":[],\"count\":0}");
+
+        packageService.getPackages(new PageRequest(1, 5), null);
+
+        verifyGetUrlIgnoringParamOrder("http://baseurl/packages?from=1&to=5");
+    }
+
+    @Test
+    public void testGetPackagesKeepsCauseWhenResponseCannotBeRead() throws Exception {
+        when(clientMock.get(anyString())).thenReturn("not json");
+
+        try {
+            packageService.getPackages(new PageRequest(1, 5), null);
+            fail("Expected an EslException");
+        } catch (EslException e) {
+            assertNotNull(e.getCause());
+        }
+    }
+
+    @Test
+    public void testDeprecatedGetPackagesStillSendsSameUrl() throws Exception {
+        when(clientMock.get(anyString())).thenReturn("{\"results\":[],\"count\":0}");
+
+        packageService.getPackages("SENT", new PageRequest(1, 5));
+
+        verify(clientMock).get("http://baseurl/packages?query=SENT&from=1&to=5");
+    }
+
+    @Test
+    public void testDeprecatedGetTemplatesStillSendsSameParams() throws Exception {
+        when(clientMock.get(anyString())).thenReturn("{\"results\":[],\"count\":0}");
+
+        packageService.getTemplates(new PageRequest(1, 5), Visibility.SENDER);
+
+        verifyGetUrlIgnoringParamOrder("http://baseurl/packages?type=template&from=1&to=5&visibility=SENDER");
+    }
+
+    @Test
+    public void testDeprecatedGetTemplatesWithoutVisibilityStillSendsSameParams() throws Exception {
+        when(clientMock.get(anyString())).thenReturn("{\"results\":[],\"count\":0}");
+
+        packageService.getTemplates(new PageRequest(1, 5));
+
+        verifyGetUrlIgnoringParamOrder("http://baseurl/packages?type=template&from=1&to=5");
+    }
+
+    @Test
+    public void testDeprecatedGetUpdatedPackagesWithinDateRangeStillSendsSameUrl() throws Exception {
+        when(clientMock.get(anyString())).thenReturn("{\"results\":[],\"count\":0}");
+
+        packageService.getUpdatedPackagesWithinDateRange(PackageStatus.SENT, new PageRequest(1, 5),
+                Date.from(Instant.parse("2026-10-01T10:00:00Z")), Date.from(Instant.parse("2026-10-02T10:00:00Z")));
+
+        verify(clientMock).get("http://baseurl/packages?query=SENT&from=1&to=5"
+                + "&startDate=2026-10-01T10:00:00Z&endDate=2026-10-02T10:00:00Z");
+    }
+
+    @Test
+    public void testDeprecatedGetPackageWithExtensionsStillSendsSameUrl() throws Exception {
+        when(clientMock.get(anyString())).thenReturn(packageJsonWithDue("pkg1", "2026-10-10T15:58:47Z"));
+
+        packageService.getPackage(new PackageId("pkg1"), Collections.singleton(DocumentPackageRequestExtension.ALERTS));
+
+        verify(clientMock).get("http://baseurl/packages/pkg1?extensions=alerts");
+    }
+
+    @Test
+    public void testPackageSerializationKeepsDueInUtc() {
+        Package apiPackage = Serialization.fromJson(packageJsonWithDue("pkg1", "2026-10-10T19:28:47+03:30"), Package.class);
+
+        assertTrue(Serialization.toJson(apiPackage).contains("\"due\":\"2026-10-10T15:58:47Z\""));
+    }
+
+    @Test
+    public void testSetDueClearsOffsetFromServer() {
+        Package apiPackage = Serialization.fromJson(packageJsonWithDue("pkg1", "2026-10-10T19:28:47+03:30"), Package.class);
+
+        apiPackage.setDue(new Date());
+
+        assertNull(apiPackage.getDueWithOffset());
+    }
+
+    // UrlTemplate keeps query params in a HashMap, so their order in the URL is not defined
+    private void verifyGetUrlIgnoringParamOrder(String expectedUrl) throws Exception {
+        ArgumentCaptor<String> url = ArgumentCaptor.forClass(String.class);
+        verify(clientMock).get(url.capture());
+        assertEquals(withSortedParams(expectedUrl), withSortedParams(url.getValue()));
+    }
+
+    private static String withSortedParams(String url) {
+        String[] pathAndQuery = url.split("\\?", 2);
+        if (pathAndQuery.length == 1) {
+            return url;
+        }
+        String[] params = pathAndQuery[1].split("&");
+        Arrays.sort(params);
+        return pathAndQuery[0] + "?" + String.join("&", params);
+    }
+
+    private String packageJsonWithDue(String packageUid, String due) {
+        return "{\"id\":\"" + packageUid + "\",\"name\":\"Test Package\",\"due\":\"" + due + "\",\"timezoneId\":\"Asia/Tehran\"}";
     }
 
     private String toApiPackageJson(String packageUid, String language) {
