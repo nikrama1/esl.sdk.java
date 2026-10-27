@@ -424,7 +424,7 @@ public class PackageService extends EslComponent {
     }
 
     /**
-     * @deprecated Please use {@link #getPackage(PackageId, Map)} with {@link PackageQueryParam#EXTENSIONS} instead.
+     * @deprecated Please use {@link #getPackageWithParams(PackageId, Map)} with {@link PackageQueryParam#EXTENSIONS} instead.
      */
     @Deprecated
     public DocumentPackage getPackage(PackageId packageId, Set<DocumentPackageRequestExtension> extensions) {
@@ -440,8 +440,8 @@ public class PackageService extends EslComponent {
      *                  expiration date in the transaction time zone. May be null.
      * @return The package
      */
-    public DocumentPackage getPackage(PackageId packageId, Map<PackageQueryParam, Object> params) {
-        Package aPackage = getApiPackage(packageId.getId(), params);
+    public DocumentPackage getPackageWithParams(PackageId packageId, Map<PackageQueryParam, Object> params) {
+        Package aPackage = getApiPackageWithParams(packageId.getId(), params);
         return packageConverter(aPackage).toSDKPackage();
     }
 
@@ -517,7 +517,7 @@ public class PackageService extends EslComponent {
      * @return The package
      * @throws EslException in case of an error
      */
-    public Package getApiPackage(String packageId, Map<PackageQueryParam, Object> params) {
+    public Package getApiPackageWithParams(String packageId, Map<PackageQueryParam, Object> params) {
         UrlTemplate urlTemplate = new UrlTemplate(getBaseUrl()).urlFor(UrlTemplate.PACKAGE_ID_PATH)
                 .replace(PACKAGE_ID_PATH_PARAM, packageId);
         if (params != null) {

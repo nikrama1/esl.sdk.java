@@ -764,8 +764,8 @@ public class PackageServiceTest {
     public void testGetPackageWithNullOrEmptyParamsSendsNoQueryString() throws Exception {
         when(clientMock.get("http://baseurl/packages/pkg1")).thenReturn(packageJsonWithDue("pkg1", "2026-10-10T15:58:47Z"));
 
-        packageService.getPackage(new PackageId("pkg1"), (Map<PackageQueryParam, Object>) null);
-        packageService.getPackage(new PackageId("pkg1"), new EnumMap<PackageQueryParam, Object>(PackageQueryParam.class));
+        packageService.getPackageWithParams(new PackageId("pkg1"), null);
+        packageService.getPackageWithParams(new PackageId("pkg1"), new EnumMap<PackageQueryParam, Object>(PackageQueryParam.class));
 
         verify(clientMock, times(2)).get("http://baseurl/packages/pkg1");
     }
@@ -777,7 +777,7 @@ public class PackageServiceTest {
         Map<PackageQueryParam, Object> params = new EnumMap<>(PackageQueryParam.class);
         params.put(PackageQueryParam.USE_TRANSACTION_TIMEZONE, true);
 
-        DocumentPackage documentPackage = packageService.getPackage(new PackageId("pkg1"), params);
+        DocumentPackage documentPackage = packageService.getPackageWithParams(new PackageId("pkg1"), params);
 
         assertEquals(OffsetDateTime.of(2026, 10, 10, 19, 28, 47, 0, ZoneOffset.ofHoursMinutes(3, 30)),
                 documentPackage.getExpiryDateWithOffset());
@@ -802,9 +802,20 @@ public class PackageServiceTest {
         params.put(PackageQueryParam.EXTENSIONS, Collections.singleton(DocumentPackageRequestExtension.ALERTS));
         params.put(PackageQueryParam.RAW_SIGNATURE_CAPTURE, null);
 
-        packageService.getPackage(new PackageId("pkg1"), params);
+        packageService.getPackageWithParams(new PackageId("pkg1"), params);
 
         verifyGetUrlIgnoringParamOrder("http://baseurl/packages/pkg1?extensions=alerts&useTransactionTimezone=true");
+    }
+
+    // Fails to compile if a getPackage or getApiPackage overload with another two-argument type is added
+    @Test
+    public void testDeprecatedGetPackageWithNullExtensionsStillCompilesAndSendsPlainUrl() throws Exception {
+        when(clientMock.get(anyString())).thenReturn(packageJsonWithDue("pkg1", "2026-10-10T15:58:47Z"));
+
+        packageService.getPackage(new PackageId("pkg1"), null);
+        packageService.getApiPackage("pkg1", null);
+
+        verify(clientMock, times(2)).get("http://baseurl/packages/pkg1");
     }
 
     @Test
@@ -814,7 +825,7 @@ public class PackageServiceTest {
         params.put(PackageQueryParam.EXTENSIONS, Arrays.asList("alerts", "other"));
         params.put(PackageQueryParam.RAW_SIGNATURE_CAPTURE, true);
 
-        packageService.getPackage(new PackageId("pkg1"), params);
+        packageService.getPackageWithParams(new PackageId("pkg1"), params);
 
         verifyGetUrlIgnoringParamOrder("http://baseurl/packages/pkg1?rawSignatureCapture=true&extensions=alerts%2Cother");
     }

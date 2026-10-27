@@ -658,7 +658,7 @@ public class EslClient {
      * @return the document package with the given packageId
      */
     public DocumentPackage getPackage(PackageId packageId, Map<PackageQueryParam, Object> params) {
-        return packageService.getPackage(packageId, params);
+        return packageService.getPackageWithParams(packageId, params);
     }
 
     /**
