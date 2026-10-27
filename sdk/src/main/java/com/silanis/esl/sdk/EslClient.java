@@ -5,6 +5,7 @@ import com.silanis.esl.api.model.SignedDocument;
 import com.silanis.esl.api.model.SignedDocuments;
 import com.silanis.esl.api.model.Verification;
 import com.silanis.esl.sdk.apitoken.ApiTokenConfig;
+import com.silanis.esl.sdk.builder.PackageRetrievalOptionsBuilder;
 import com.silanis.esl.sdk.internal.Asserts;
 import com.silanis.esl.sdk.internal.RestClient;
 import com.silanis.esl.sdk.internal.SignerRestClient;
@@ -653,16 +654,18 @@ public class EslClient {
 
     /**
      * @param packageId The document package identifier
-     * @param params    The query parameters, e.g. {@link PackageQueryParam#USE_TRANSACTION_TIMEZONE} to return the
-     *                  expiration date in the transaction time zone. Parameters with a null or blank value are not sent.
+     * @param options   The options, built with {@link PackageRetrievalOptionsBuilder}, e.g.
+     *                  {@link PackageRetrievalOptionsBuilder#withTransactionTimezone()} to return the expiration date in
+     *                  the transaction time zone. Options left unset are not sent.
      * @return the document package with the given packageId
      */
-    public DocumentPackage getPackage(PackageId packageId, Map<PackageQueryParam, Object> params) {
-        return packageService.getPackageWithParams(packageId, params);
+    public DocumentPackage getPackage(PackageId packageId, PackageRetrievalOptions options) {
+        return packageService.getPackageWithOptions(packageId, options);
     }
 
     /**
-     * @deprecated Please use {@link #getPackage(PackageId, Map)} with {@link PackageQueryParam#EXTENSIONS} instead.
+     * @deprecated Please use {@link #getPackage(PackageId, PackageRetrievalOptions)} with
+     * {@link PackageRetrievalOptionsBuilder#withExtensions} instead.
      */
     @Deprecated
     public DocumentPackage getPackageWithExtensions(PackageId packageId, DocumentPackageRequestExtension... extensions) {

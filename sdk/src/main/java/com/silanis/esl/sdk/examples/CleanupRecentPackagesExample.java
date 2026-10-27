@@ -5,7 +5,7 @@ import com.silanis.esl.sdk.DocumentPackage;
 import com.silanis.esl.sdk.Group;
 import com.silanis.esl.sdk.GroupId;
 import com.silanis.esl.sdk.PackageId;
-import com.silanis.esl.sdk.PackageListQueryParam;
+import com.silanis.esl.sdk.PackageListOptions;
 import com.silanis.esl.sdk.PackageStatus;
 import com.silanis.esl.sdk.Page;
 import com.silanis.esl.sdk.PageRequest;
@@ -18,11 +18,12 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
+import static com.silanis.esl.sdk.builder.PackageListOptionsBuilder.newPackageListOptions;
 
 /**
  * Deletes all packages, transactions, templates and invited/created senders
@@ -81,11 +82,11 @@ public class CleanupRecentPackagesExample extends SDKSample {
     private void deletePackagesUpdatedWithinRange(PackageStatus status, Date from, Date to) {
         PageRequest request = new PageRequest(1, PAGE_SIZE);
         while (true) {
-            Map<PackageListQueryParam, Object> params = new EnumMap<>(PackageListQueryParam.class);
-            params.put(PackageListQueryParam.QUERY, status);
-            params.put(PackageListQueryParam.START_DATE, from);
-            params.put(PackageListQueryParam.END_DATE, to);
-            Page<DocumentPackage> page = eslClient.getPackageService().getPackages(request, params);
+            PackageListOptions options = newPackageListOptions()
+                    .withStatus(status)
+                    .withDateRange(from, to)
+                    .build();
+            Page<DocumentPackage> page = eslClient.getPackageService().getPackagesWithOptions(request, options);
             for (DocumentPackage pkg : page) {
 
                 if (deletePackageIfAllowed(pkg.getId(), "package")) {
@@ -130,9 +131,8 @@ public class CleanupRecentPackagesExample extends SDKSample {
     private void deleteTemplatesUpdatedWithinRange(Date from) {
         PageRequest request = new PageRequest(1, PAGE_SIZE);
         while (true) {
-            Map<PackageListQueryParam, Object> params = new EnumMap<>(PackageListQueryParam.class);
-            params.put(PackageListQueryParam.TYPE, "template");
-            Page<DocumentPackage> page = eslClient.getPackageService().getPackages(request, params);
+            Page<DocumentPackage> page = eslClient.getPackageService()
+                    .getPackagesWithOptions(request, newPackageListOptions().forTemplates().build());
             for (DocumentPackage template : page) {
                 Date updatedDate = template.getUpdatedDate();
                 if (updatedDate != null && !updatedDate.before(from)

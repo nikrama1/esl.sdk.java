@@ -267,7 +267,8 @@ public class DocumentPackage implements Serializable {
      * Returns the expiration date with the UTC offset of the transaction time zone.
      * <p>
      * Only set when the package was retrieved with
-     * {@link PackageQueryParam#USE_TRANSACTION_TIMEZONE} or {@link PackageListQueryParam#USE_TRANSACTION_TIMEZONE};
+     * {@link com.silanis.esl.sdk.builder.PackageRetrievalOptionsBuilder#withTransactionTimezone()} or
+     * {@link com.silanis.esl.sdk.builder.PackageListOptionsBuilder#withTransactionTimezone()};
      * otherwise null, and {@link #getExpiryDate()} should be used. Also null when the transaction time zone has no
      * offset from UTC at the expiration date (e.g. UTC), because the server then returns the date with "Z".
      *

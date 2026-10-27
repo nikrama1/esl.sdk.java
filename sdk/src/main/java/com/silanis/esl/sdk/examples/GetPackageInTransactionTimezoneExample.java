@@ -2,18 +2,17 @@ package com.silanis.esl.sdk.examples;
 
 import com.silanis.esl.sdk.DocumentPackage;
 import com.silanis.esl.sdk.DocumentType;
-import com.silanis.esl.sdk.PackageListQueryParam;
-import com.silanis.esl.sdk.PackageQueryParam;
+import com.silanis.esl.sdk.PackageListOptions;
 import com.silanis.esl.sdk.PackageStatus;
 import com.silanis.esl.sdk.Page;
 import com.silanis.esl.sdk.PageRequest;
 
 import java.util.Date;
-import java.util.EnumMap;
-import java.util.Map;
 
 import static com.silanis.esl.sdk.builder.DocumentBuilder.newDocumentWithName;
 import static com.silanis.esl.sdk.builder.PackageBuilder.newPackageNamed;
+import static com.silanis.esl.sdk.builder.PackageListOptionsBuilder.newPackageListOptions;
+import static com.silanis.esl.sdk.builder.PackageRetrievalOptionsBuilder.newPackageRetrievalOptions;
 import static com.silanis.esl.sdk.builder.SignatureBuilder.signatureFor;
 import static com.silanis.esl.sdk.builder.SignerBuilder.newSignerWithEmail;
 import static org.joda.time.DateTime.now;
@@ -62,18 +61,17 @@ public class GetPackageInTransactionTimezoneExample extends SDKSample {
         packageInUtc = eslClient.getPackage(packageId);
 
         // The expiration date is returned in the transaction time zone
-        Map<PackageQueryParam, Object> params = new EnumMap<>(PackageQueryParam.class);
-        params.put(PackageQueryParam.USE_TRANSACTION_TIMEZONE, true);
-        packageInTransactionTimezone = eslClient.getPackage(packageId, params);
+        packageInTransactionTimezone = eslClient.getPackage(packageId,
+                newPackageRetrievalOptions().withTransactionTimezone().build());
         System.out.println("Expiry date in the transaction time zone: " + packageInTransactionTimezone.getExpiryDateWithOffset());
 
-        // The same parameter applies to a page of packages
-        Map<PackageListQueryParam, Object> listParams = new EnumMap<>(PackageListQueryParam.class);
-        listParams.put(PackageListQueryParam.QUERY, PackageStatus.DRAFT);
-        listParams.put(PackageListQueryParam.START_DATE, createdFrom);
-        listParams.put(PackageListQueryParam.END_DATE, now().plusMinutes(1).toDate());
-        listParams.put(PackageListQueryParam.USE_TRANSACTION_TIMEZONE, true);
-        Page<DocumentPackage> resultPage = eslClient.getPackageService().getPackages(new PageRequest(1), listParams);
+        // The same option applies to a page of packages
+        PackageListOptions listOptions = newPackageListOptions()
+                .withStatus(PackageStatus.DRAFT)
+                .withDateRange(createdFrom, now().plusMinutes(1).toDate())
+                .withTransactionTimezone()
+                .build();
+        Page<DocumentPackage> resultPage = eslClient.getPackageService().getPackagesWithOptions(new PageRequest(1), listOptions);
         for (DocumentPackage documentPackage : resultPage) {
             if (packageId.equals(documentPackage.getId())) {
                 listedPackageInTransactionTimezone = documentPackage;

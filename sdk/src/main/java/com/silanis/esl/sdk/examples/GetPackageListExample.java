@@ -2,16 +2,13 @@ package com.silanis.esl.sdk.examples;
 
 import com.silanis.esl.sdk.DocumentPackage;
 import com.silanis.esl.sdk.DocumentType;
-import com.silanis.esl.sdk.PackageListQueryParam;
 import com.silanis.esl.sdk.PackageStatus;
 import com.silanis.esl.sdk.Page;
 import com.silanis.esl.sdk.PageRequest;
 import com.silanis.esl.sdk.builder.FieldBuilder;
 
-import java.util.EnumMap;
-import java.util.Map;
-
 import static com.silanis.esl.sdk.builder.DocumentBuilder.newDocumentWithName;
+import static com.silanis.esl.sdk.builder.PackageListOptionsBuilder.newPackageListOptions;
 import static com.silanis.esl.sdk.builder.PackageBuilder.newPackageNamed;
 import static com.silanis.esl.sdk.builder.SignatureBuilder.signatureFor;
 import static com.silanis.esl.sdk.builder.SignerBuilder.newSignerWithEmail;
@@ -50,8 +47,7 @@ public class GetPackageListExample extends SDKSample {
 
         packageId = eslClient.createPackage( superDuperPackage );
 
-        Map<PackageListQueryParam, Object> params = new EnumMap<>(PackageListQueryParam.class);
-        params.put(PackageListQueryParam.QUERY, PackageStatus.SENT);
-        Page<DocumentPackage> resultPage = eslClient.getPackageService().getPackages( new PageRequest( 1 ), params );
+        Page<DocumentPackage> resultPage = eslClient.getPackageService().getPackagesWithOptions( new PageRequest( 1 ),
+                newPackageListOptions().withStatus( PackageStatus.SENT ).build() );
     }
 }

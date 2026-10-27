@@ -14,6 +14,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
+import static com.silanis.esl.sdk.builder.PackageListOptionsBuilder.newPackageListOptions;
+import static com.silanis.esl.sdk.builder.PackageRetrievalOptionsBuilder.newPackageRetrievalOptions;
 
 import java.io.IOException;
 import java.lang.reflect.Method;
@@ -24,7 +26,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
-import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -761,11 +762,11 @@ public class PackageServiceTest {
     }
 
     @Test
-    public void testGetPackageWithNullOrEmptyParamsSendsNoQueryString() throws Exception {
+    public void testGetPackageWithNullOrEmptyOptionsSendsNoQueryString() throws Exception {
         when(clientMock.get("http://baseurl/packages/pkg1")).thenReturn(packageJsonWithDue("pkg1", "2026-10-10T15:58:47Z"));
 
-        packageService.getPackageWithParams(new PackageId("pkg1"), null);
-        packageService.getPackageWithParams(new PackageId("pkg1"), new EnumMap<PackageQueryParam, Object>(PackageQueryParam.class));
+        packageService.getPackageWithOptions(new PackageId("pkg1"), null);
+        packageService.getPackageWithOptions(new PackageId("pkg1"), newPackageRetrievalOptions().build());
 
         verify(clientMock, times(2)).get("http://baseurl/packages/pkg1");
     }
@@ -774,10 +775,9 @@ public class PackageServiceTest {
     public void testGetPackageWithTransactionTimezoneReturnsExpiryDateWithOffset() throws Exception {
         when(clientMock.get("http://baseurl/packages/pkg1?useTransactionTimezone=true"))
                 .thenReturn(packageJsonWithDue("pkg1", "2026-10-10T19:28:47+03:30"));
-        Map<PackageQueryParam, Object> params = new EnumMap<>(PackageQueryParam.class);
-        params.put(PackageQueryParam.USE_TRANSACTION_TIMEZONE, true);
 
-        DocumentPackage documentPackage = packageService.getPackageWithParams(new PackageId("pkg1"), params);
+        DocumentPackage documentPackage = packageService.getPackageWithOptions(new PackageId("pkg1"),
+                newPackageRetrievalOptions().withTransactionTimezone().build());
 
         assertEquals(OffsetDateTime.of(2026, 10, 10, 19, 28, 47, 0, ZoneOffset.ofHoursMinutes(3, 30)),
                 documentPackage.getExpiryDateWithOffset());
@@ -795,14 +795,13 @@ public class PackageServiceTest {
     }
 
     @Test
-    public void testGetPackageSendsAllParamsAndSkipsNullValues() throws Exception {
+    public void testGetPackageSendsOnlyTheOptionsThatAreSet() throws Exception {
         when(clientMock.get(anyString())).thenReturn(packageJsonWithDue("pkg1", "2026-10-10T15:58:47Z"));
-        Map<PackageQueryParam, Object> params = new EnumMap<>(PackageQueryParam.class);
-        params.put(PackageQueryParam.USE_TRANSACTION_TIMEZONE, true);
-        params.put(PackageQueryParam.EXTENSIONS, Collections.singleton(DocumentPackageRequestExtension.ALERTS));
-        params.put(PackageQueryParam.RAW_SIGNATURE_CAPTURE, null);
 
-        packageService.getPackageWithParams(new PackageId("pkg1"), params);
+        packageService.getPackageWithOptions(new PackageId("pkg1"), newPackageRetrievalOptions()
+                .withTransactionTimezone()
+                .withExtensions(DocumentPackageRequestExtension.ALERTS)
+                .build());
 
         verifyGetUrlIgnoringParamOrder("http://baseurl/packages/pkg1?extensions=alerts&useTransactionTimezone=true");
     }
@@ -819,43 +818,61 @@ public class PackageServiceTest {
     }
 
     @Test
-    public void testGetPackageJoinsExtensionValuesWithComma() throws Exception {
+    public void testGetPackageSendsRawSignatureCapture() throws Exception {
         when(clientMock.get(anyString())).thenReturn(packageJsonWithDue("pkg1", "2026-10-10T15:58:47Z"));
-        Map<PackageQueryParam, Object> params = new EnumMap<>(PackageQueryParam.class);
-        params.put(PackageQueryParam.EXTENSIONS, Arrays.asList("alerts", "other"));
-        params.put(PackageQueryParam.RAW_SIGNATURE_CAPTURE, true);
 
-        packageService.getPackageWithParams(new PackageId("pkg1"), params);
+        packageService.getPackageWithOptions(new PackageId("pkg1"), newPackageRetrievalOptions().withRawSignatureCapture().build());
 
-        verifyGetUrlIgnoringParamOrder("http://baseurl/packages/pkg1?rawSignatureCapture=true&extensions=alerts%2Cother");
+        verify(clientMock).get("http://baseurl/packages/pkg1?rawSignatureCapture=true");
     }
 
     @Test
     public void testGetPackagesSendsPageBoundsAndConvertsValues() throws Exception {
         when(clientMock.get(anyString()))
                 .thenReturn("{\"results\":[" + packageJsonWithDue("pkg1", "2026-10-10T19:28:47+03:30") + "],\"count\":1}");
-        Map<PackageListQueryParam, Object> params = new EnumMap<>(PackageListQueryParam.class);
-        params.put(PackageListQueryParam.QUERY, PackageStatus.SENT);
-        params.put(PackageListQueryParam.SEARCH, "John Smith+1");
-        params.put(PackageListQueryParam.VISIBILITY, Visibility.SENDER);
-        params.put(PackageListQueryParam.START_DATE, Date.from(Instant.parse("2026-10-01T10:00:00Z")));
-        params.put(PackageListQueryParam.OWNER_EMAIL, "  ");
-        params.put(PackageListQueryParam.USE_TRANSACTION_TIMEZONE, true);
+        PackageListOptions options = newPackageListOptions()
+                .withStatus(PackageStatus.SENT)
+                .withDateRange(Date.from(Instant.parse("2026-10-01T10:00:00Z")), null)
+                .withTransactionTimezone()
+                .build();
 
-        Page<DocumentPackage> page = packageService.getPackages(new PageRequest(1, 5), params);
+        Page<DocumentPackage> page = packageService.getPackagesWithOptions(new PageRequest(1, 5), options);
 
-        verifyGetUrlIgnoringParamOrder("http://baseurl/packages?from=1&to=5&query=SENT&search=John+Smith%2B1&visibility=SENDER"
+        verifyGetUrlIgnoringParamOrder("http://baseurl/packages?from=1&to=5&query=SENT"
                 + "&startDate=2026-10-01T10%3A00%3A00Z&useTransactionTimezone=true");
         assertEquals(ZoneOffset.ofHoursMinutes(3, 30), page.iterator().next().getExpiryDateWithOffset().getOffset());
     }
 
     @Test
-    public void testGetPackagesWithNullParamsSendsOnlyPageBounds() throws Exception {
+    public void testGetPackagesWithNullOrEmptyOptionsSendsOnlyPageBounds() throws Exception {
         when(clientMock.get(anyString())).thenReturn("{\"results\":[],\"count\":0}");
 
-        packageService.getPackages(new PageRequest(1, 5), null);
+        packageService.getPackagesWithOptions(new PageRequest(1, 5), null);
+        packageService.getPackagesWithOptions(new PageRequest(1, 5), newPackageListOptions().build());
 
-        verifyGetUrlIgnoringParamOrder("http://baseurl/packages?from=1&to=5");
+        verifyGetUrlIgnoringParamOrder("http://baseurl/packages?from=1&to=5", 2);
+    }
+
+    @Test
+    public void testGetPackagesSendsTemplateTypeAndVisibility() throws Exception {
+        when(clientMock.get(anyString())).thenReturn("{\"results\":[],\"count\":0}");
+
+        packageService.getPackagesWithOptions(new PageRequest(1, 5),
+                newPackageListOptions().forTemplates().withVisibility(Visibility.ACCOUNT).build());
+
+        verifyGetUrlIgnoringParamOrder("http://baseurl/packages?from=1&to=5&type=template&visibility=ACCOUNT");
+    }
+
+    @Test
+    public void testGetPackagesSendsOnlyEndDateForOpenStartRange() throws Exception {
+        when(clientMock.get(anyString())).thenReturn("{\"results\":[],\"count\":0}");
+        PackageListOptions options = newPackageListOptions()
+                .withDateRange(null, Date.from(Instant.parse("2026-10-02T10:00:00Z")))
+                .build();
+
+        packageService.getPackagesWithOptions(new PageRequest(1, 5), options);
+
+        verifyGetUrlIgnoringParamOrder("http://baseurl/packages?from=1&to=5&endDate=2026-10-02T10%3A00%3A00Z");
     }
 
     @Test
@@ -863,7 +880,7 @@ public class PackageServiceTest {
         when(clientMock.get(anyString())).thenReturn("not json");
 
         try {
-            packageService.getPackages(new PageRequest(1, 5), null);
+            packageService.getPackagesWithOptions(new PageRequest(1, 5), null);
             fail("Expected an EslException");
         } catch (EslException e) {
             assertNotNull(e.getCause());
@@ -874,7 +891,7 @@ public class PackageServiceTest {
     public void testDeprecatedGetPackagesStillSendsSameUrl() throws Exception {
         when(clientMock.get(anyString())).thenReturn("{\"results\":[],\"count\":0}");
 
-        packageService.getPackages("SENT", new PageRequest(1, 5));
+        packageService.getPackages(PackageStatus.SENT.name(), new PageRequest(1, 5));
 
         verify(clientMock).get("http://baseurl/packages?query=SENT&from=1&to=5");
     }
@@ -935,9 +952,15 @@ public class PackageServiceTest {
 
     // UrlTemplate keeps query params in a HashMap, so their order in the URL is not defined
     private void verifyGetUrlIgnoringParamOrder(String expectedUrl) throws Exception {
+        verifyGetUrlIgnoringParamOrder(expectedUrl, 1);
+    }
+
+    private void verifyGetUrlIgnoringParamOrder(String expectedUrl, int wantedNumberOfCalls) throws Exception {
         ArgumentCaptor<String> url = ArgumentCaptor.forClass(String.class);
-        verify(clientMock).get(url.capture());
-        assertEquals(withSortedParams(expectedUrl), withSortedParams(url.getValue()));
+        verify(clientMock, times(wantedNumberOfCalls)).get(url.capture());
+        for (String actualUrl : url.getAllValues()) {
+            assertEquals(withSortedParams(expectedUrl), withSortedParams(actualUrl));
+        }
     }
 
     private static String withSortedParams(String url) {

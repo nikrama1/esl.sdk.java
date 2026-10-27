@@ -27,8 +27,8 @@ import com.silanis.esl.sdk.FastTrackSigner;
 import com.silanis.esl.sdk.FieldOverlapValidationResult;
 import com.silanis.esl.sdk.GroupId;
 import com.silanis.esl.sdk.PackageId;
-import com.silanis.esl.sdk.PackageListQueryParam;
-import com.silanis.esl.sdk.PackageQueryParam;
+import com.silanis.esl.sdk.PackageListOptions;
+import com.silanis.esl.sdk.PackageRetrievalOptions;
 import com.silanis.esl.sdk.PackageStatus;
 import com.silanis.esl.sdk.PackageUpdateWorkflowResult;
 import com.silanis.esl.sdk.Page;
@@ -39,6 +39,8 @@ import com.silanis.esl.sdk.SignerId;
 import com.silanis.esl.sdk.SigningStatus;
 import com.silanis.esl.sdk.Visibility;
 import com.silanis.esl.sdk.builder.FastTrackRoleBuilder;
+import com.silanis.esl.sdk.builder.PackageListOptionsBuilder;
+import com.silanis.esl.sdk.builder.PackageRetrievalOptionsBuilder;
 import com.silanis.esl.sdk.internal.Asserts;
 import com.silanis.esl.sdk.internal.DateHelper;
 import com.silanis.esl.sdk.internal.EslServerException;
@@ -424,7 +426,8 @@ public class PackageService extends EslComponent {
     }
 
     /**
-     * @deprecated Please use {@link #getPackageWithParams(PackageId, Map)} with {@link PackageQueryParam#EXTENSIONS} instead.
+     * @deprecated Please use {@link #getPackageWithOptions(PackageId, PackageRetrievalOptions)} with
+     * {@link PackageRetrievalOptionsBuilder#withExtensions} instead.
      */
     @Deprecated
     public DocumentPackage getPackage(PackageId packageId, Set<DocumentPackageRequestExtension> extensions) {
@@ -433,15 +436,16 @@ public class PackageService extends EslComponent {
     }
 
     /**
-     * Gets the package, sending the given query parameters. Parameters with a null or blank value are not sent.
+     * Gets the package, sending the given options. Options left unset are not sent.
      *
      * @param packageId The package id
-     * @param params    The query parameters, e.g. {@link PackageQueryParam#USE_TRANSACTION_TIMEZONE} to return the
-     *                  expiration date in the transaction time zone. May be null.
+     * @param options   The options, built with {@link PackageRetrievalOptionsBuilder}, e.g.
+     *                  {@link PackageRetrievalOptionsBuilder#withTransactionTimezone()} to return the expiration date in
+     *                  the transaction time zone. May be null.
      * @return The package
      */
-    public DocumentPackage getPackageWithParams(PackageId packageId, Map<PackageQueryParam, Object> params) {
-        Package aPackage = getApiPackageWithParams(packageId.getId(), params);
+    public DocumentPackage getPackageWithOptions(PackageId packageId, PackageRetrievalOptions options) {
+        Package aPackage = getApiPackageWithOptions(packageId.getId(), options);
         return packageConverter(aPackage).toSDKPackage();
     }
 
@@ -511,67 +515,45 @@ public class PackageService extends EslComponent {
     }
 
     /**
-     * Retrieves the package, sending the given query parameters. Parameters with a null or blank value are not sent.
+     * Retrieves the package, sending the given options. Options left unset are not sent.
      * @param packageId The package id
-     * @param params The query parameters. May be null.
+     * @param options The options. May be null.
      * @return The package
      * @throws EslException in case of an error
      */
-    public Package getApiPackageWithParams(String packageId, Map<PackageQueryParam, Object> params) {
+    public Package getApiPackageWithOptions(String packageId, PackageRetrievalOptions options) {
         UrlTemplate urlTemplate = new UrlTemplate(getBaseUrl()).urlFor(UrlTemplate.PACKAGE_ID_PATH)
                 .replace(PACKAGE_ID_PATH_PARAM, packageId);
-        if (params != null) {
-            for (Map.Entry<PackageQueryParam, Object> param : params.entrySet()) {
-                urlTemplate.addParam(param.getKey().getValue(), toQueryParamValue(param.getValue()));
+        if (options != null) {
+            List<String> extensions = new ArrayList<String>();
+            for (DocumentPackageRequestExtension extension : options.getExtensions()) {
+                extensions.add(extension.getValue());
             }
+            urlTemplate.addParam("rawSignatureCapture", toQueryParamValue(options.getRawSignatureCapture()))
+                    .addParam("extensions", toQueryParamValue(StringUtils.join(extensions, ",")))
+                    .addParam("useTransactionTimezone", toQueryParamValue(options.getUseTransactionTimezone()));
         }
 
         return getApiPackageWithPath(urlTemplate.build());
     }
 
     /**
-     * Converts a query parameter value to its URL-encoded API form, or null when there is no value.
+     * Converts a query parameter value to its URL-encoded form, or null when there is no value so that it is not sent.
      */
     private static String toQueryParamValue(Object value) {
-        if (value == null) {
-            return null;
-        }
-
-        String apiValue;
-        if (value instanceof Collection) {
-            List<String> values = new ArrayList<String>();
-            for (Object element : (Collection<?>) value) {
-                values.add(toApiValue(element));
-            }
-            apiValue = StringUtils.join(values, ",");
-        } else {
-            apiValue = toApiValue(value);
-        }
-        if (StringUtils.isBlank(apiValue)) {
+        if (value == null || StringUtils.isBlank(value.toString())) {
             return null;
         }
 
         try {
-            return URLEncoder.encode(apiValue, RestClient.CHARSET_UTF_8);
+            return URLEncoder.encode(value.toString(), RestClient.CHARSET_UTF_8);
         } catch (UnsupportedEncodingException e) {
-            throw new EslException("Could not encode query parameter value: " + apiValue, e);
+            throw new EslException("Could not encode query parameter value: " + value, e);
         }
     }
 
-    private static String toApiValue(Object value) {
-        if (value instanceof DocumentPackageRequestExtension) {
-            return ((DocumentPackageRequestExtension) value).getValue();
-        }
-        if (value instanceof PackageStatus) {
-            return new PackageStatusConverter((PackageStatus) value).toAPIPackageStatus();
-        }
-        if (value instanceof Date) {
-            return DateHelper.dateToIsoUtcFormat((Date) value);
-        }
-        if (value instanceof Enum) {
-            return ((Enum<?>) value).name();
-        }
-        return String.valueOf(value);
+    private static String toQueryParamValue(Date date) {
+        return date == null ? null : toQueryParamValue(DateHelper.dateToIsoUtcFormat(date));
     }
 
     /**
@@ -1226,7 +1208,8 @@ public class PackageService extends EslComponent {
      * @param status  Returned DocumentPackages must have their status set to this value to be included in the result set
      * @param request Identifying which page of results to return
      * @return List of DocumentPackages that populate the specified page
-     * @deprecated Please use {@link #getPackages(PageRequest, Map)} with {@link PackageListQueryParam#QUERY} instead.
+     * @deprecated Please use {@link #getPackagesWithOptions(PageRequest, PackageListOptions)} with
+     * {@link PackageListOptionsBuilder#withStatus} instead.
      */
     @Deprecated
     public com.silanis.esl.sdk.Page<DocumentPackage> getPackages(String status, PageRequest request) {
@@ -1250,24 +1233,28 @@ public class PackageService extends EslComponent {
     }
 
     /**
-     * Returns a Page of DocumentPackages, sending the given query parameters. Parameters with a null or blank value are not sent.
+     * Returns a Page of DocumentPackages, sending the given options. Options left unset are not sent.
      * <p>
-     * For example, {@link PackageListQueryParam#QUERY} filters by status, {@link PackageListQueryParam#TYPE} set to "template"
-     * returns templates, and {@link PackageListQueryParam#USE_TRANSACTION_TIMEZONE} returns the expiration dates in the
-     * transaction time zone.
+     * For example, {@link PackageListOptionsBuilder#withStatus} filters by status,
+     * {@link PackageListOptionsBuilder#forTemplates()} returns templates, and
+     * {@link PackageListOptionsBuilder#withTransactionTimezone()} returns the expiration dates in the transaction time zone.
      *
      * @param request Identifying which page of results to return
-     * @param params  The query parameters. May be null.
+     * @param options The options, built with {@link PackageListOptionsBuilder}. May be null.
      * @return List of DocumentPackages that populate the specified page
      */
-    public com.silanis.esl.sdk.Page<DocumentPackage> getPackages(PageRequest request, Map<PackageListQueryParam, Object> params) {
+    public com.silanis.esl.sdk.Page<DocumentPackage> getPackagesWithOptions(PageRequest request, PackageListOptions options) {
         UrlTemplate urlTemplate = new UrlTemplate(getBaseUrl()).urlFor(UrlTemplate.PACKAGE_PATH)
                 .addParam("from", Integer.toString(request.getFrom()))
                 .addParam("to", Integer.toString(request.to()));
-        if (params != null) {
-            for (Map.Entry<PackageListQueryParam, Object> param : params.entrySet()) {
-                urlTemplate.addParam(param.getKey().getValue(), toQueryParamValue(param.getValue()));
-            }
+        if (options != null) {
+            urlTemplate.addParam("type", options.isTemplates() ? "template" : null)
+                    .addParam("query", options.getStatus() == null ? null
+                            : toQueryParamValue(new PackageStatusConverter(options.getStatus()).toAPIPackageStatus()))
+                    .addParam("visibility", options.getVisibility() == null ? null : toQueryParamValue(options.getVisibility().name()))
+                    .addParam("startDate", toQueryParamValue(options.getStartDate()))
+                    .addParam("endDate", toQueryParamValue(options.getEndDate()))
+                    .addParam("useTransactionTimezone", toQueryParamValue(options.getUseTransactionTimezone()));
         }
 
         try {
@@ -1318,8 +1305,8 @@ public class PackageService extends EslComponent {
      * @param from Date range starting from this date included
      * @param to Date range ending of this date included
      * @return List of DocumentPackages that populate the specified page
-     * @deprecated Please use {@link #getPackages(PageRequest, Map)} with {@link PackageListQueryParam#QUERY},
-     * {@link PackageListQueryParam#START_DATE} and {@link PackageListQueryParam#END_DATE} instead.
+     * @deprecated Please use {@link #getPackagesWithOptions(PageRequest, PackageListOptions)} with
+     * {@link PackageListOptionsBuilder#withStatus} and {@link PackageListOptionsBuilder#withDateRange(Date, Date)} instead.
      */
     @Deprecated
     public com.silanis.esl.sdk.Page<DocumentPackage> getUpdatedPackagesWithinDateRange(PackageStatus status, PageRequest request, Date from, Date to) {
@@ -1526,7 +1513,8 @@ public class PackageService extends EslComponent {
     }
 
     /**
-     * @deprecated Please use {@link #getPackages(PageRequest, Map)} with {@link PackageListQueryParam#TYPE} set to "template" instead.
+     * @deprecated Please use {@link #getPackagesWithOptions(PageRequest, PackageListOptions)} with
+     * {@link PackageListOptionsBuilder#forTemplates()} instead.
      */
     @Deprecated
     public com.silanis.esl.sdk.Page<DocumentPackage> getTemplates(PageRequest request) {
@@ -1540,8 +1528,8 @@ public class PackageService extends EslComponent {
     }
 
     /**
-     * @deprecated Please use {@link #getPackages(PageRequest, Map)} with {@link PackageListQueryParam#TYPE} set to "template"
-     * and {@link PackageListQueryParam#VISIBILITY} instead.
+     * @deprecated Please use {@link #getPackagesWithOptions(PageRequest, PackageListOptions)} with
+     * {@link PackageListOptionsBuilder#forTemplates()} and {@link PackageListOptionsBuilder#withVisibility} instead.
      */
     @Deprecated
     public com.silanis.esl.sdk.Page<DocumentPackage> getTemplates(PageRequest request, Visibility visibility) {

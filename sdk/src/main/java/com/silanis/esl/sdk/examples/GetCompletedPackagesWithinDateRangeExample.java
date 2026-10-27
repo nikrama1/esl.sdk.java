@@ -1,7 +1,7 @@
 package com.silanis.esl.sdk.examples;
 
 import com.silanis.esl.sdk.DocumentPackage;
-import com.silanis.esl.sdk.PackageListQueryParam;
+import com.silanis.esl.sdk.PackageListOptions;
 import com.silanis.esl.sdk.PackageStatus;
 import com.silanis.esl.sdk.Page;
 import com.silanis.esl.sdk.PageRequest;
@@ -9,8 +9,8 @@ import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 
 import java.util.Date;
-import java.util.EnumMap;
-import java.util.Map;
+
+import static com.silanis.esl.sdk.builder.PackageListOptionsBuilder.newPackageListOptions;
 
 /**
  * Created by mina on 29/12/14.
@@ -47,11 +47,11 @@ public class GetCompletedPackagesWithinDateRangeExample extends SDKSample {
     }
 
     private Page<DocumentPackage> getPackagesByPackageStatus(PackageStatus packageStatus, Date startDate, Date endDate) {
-        Map<PackageListQueryParam, Object> params = new EnumMap<>(PackageListQueryParam.class);
-        params.put(PackageListQueryParam.QUERY, packageStatus);
-        params.put(PackageListQueryParam.START_DATE, startDate);
-        params.put(PackageListQueryParam.END_DATE, endDate);
-        Page<DocumentPackage> resultPage = eslClient.getPackageService().getPackages(new PageRequest(1), params);
+        PackageListOptions options = newPackageListOptions()
+                .withStatus(packageStatus)
+                .withDateRange(startDate, endDate)
+                .build();
+        Page<DocumentPackage> resultPage = eslClient.getPackageService().getPackagesWithOptions(new PageRequest(1), options);
         return resultPage;
     }
 }
