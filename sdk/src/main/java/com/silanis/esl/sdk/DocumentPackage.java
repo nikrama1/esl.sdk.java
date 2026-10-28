@@ -253,6 +253,7 @@ public class DocumentPackage implements Serializable {
      */
     public void setExpiryDate( Date expiryDate ) {
         this.expiryDate = expiryDate;
+        this.expiryDateWithOffset = null;
     }
 
     public Date getExpiryDate() {
