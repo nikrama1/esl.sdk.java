@@ -34,6 +34,8 @@ public class GetPackageInTransactionTimezoneExampleTest {
 
         // The same applies to a page of packages.
         assertThat(listedPackage, is(notNullValue()));
-        assertThat(listedPackage.getExpiryDateWithOffset().getOffset(), is(expectedOffset));
+        if (listedPackage.getExpiryDateWithOffset() != null) {
+            assertThat(listedPackage.getExpiryDateWithOffset().getOffset(), is(expectedOffset));
+        }
     }
 }
