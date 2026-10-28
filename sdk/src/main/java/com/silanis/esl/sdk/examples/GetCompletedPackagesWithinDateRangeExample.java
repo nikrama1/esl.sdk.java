@@ -48,7 +48,7 @@ public class GetCompletedPackagesWithinDateRangeExample extends SDKSample {
 
     private Page<DocumentPackage> getPackagesByPackageStatus(PackageStatus packageStatus, Date startDate, Date endDate) {
         PackageListOptions options = newPackageListOptions()
-                .withStatus(packageStatus)
+                .withStatus(packageStatus.name())
                 .withDateRange(startDate, endDate)
                 .build();
         Page<DocumentPackage> resultPage = eslClient.getPackageService().getPackagesWithOptions(new PageRequest(1), options);

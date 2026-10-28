@@ -83,7 +83,7 @@ public class CleanupRecentPackagesExample extends SDKSample {
         PageRequest request = new PageRequest(1, PAGE_SIZE);
         while (true) {
             PackageListOptions options = newPackageListOptions()
-                    .withStatus(status)
+                    .withStatus(status.name())
                     .withDateRange(from, to)
                     .build();
             Page<DocumentPackage> page = eslClient.getPackageService().getPackagesWithOptions(request, options);

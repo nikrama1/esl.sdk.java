@@ -5,6 +5,7 @@ import com.silanis.esl.sdk.PackageStatus;
 import com.silanis.esl.sdk.Visibility;
 
 import java.util.Date;
+import java.util.Objects;
 
 /**
  * Builds the options sent when retrieving a page of packages or templates.
@@ -12,7 +13,7 @@ import java.util.Date;
 public class PackageListOptionsBuilder {
 
     private boolean templates;
-    private PackageStatus status;
+    private String status;
     private Visibility visibility;
     private Date startDate;
     private Date endDate;
@@ -41,14 +42,18 @@ public class PackageListOptionsBuilder {
     }
 
     /**
-     * Lists only the packages with this status. Ignored when listing templates.
+     * Lists only the packages matching this value, sent as is in the query parameter. Ignored when listing templates.
      * <p>
-     * {@link PackageStatus#DRAFT} also returns declined, expired and opted out packages.
+     * Accepts a package status such as "SENT" (see {@link PackageStatus#name()}), "ARCHIVAL_PENDING",
+     * "ARCHIVAL_VALIDATING", "ARCHIVAL_COMPLETED" or "ARCHIVAL_INTERVENTION_REQUIRED", or one of "inbox", "trashed"
+     * and "overview". "DRAFT" also returns declined, expired and opted out packages. The server ignores an unknown
+     * value and then returns all the packages.
      *
+     * @param status The status, not null
      * @return This
      */
-    public PackageListOptionsBuilder withStatus(PackageStatus status) {
-        this.status = status;
+    public PackageListOptionsBuilder withStatus(String status) {
+        this.status = Objects.requireNonNull(status, "status");
         return this;
     }
 

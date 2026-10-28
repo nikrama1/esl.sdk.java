@@ -831,7 +831,7 @@ public class PackageServiceTest {
         when(clientMock.get(anyString()))
                 .thenReturn("{\"results\":[" + packageJsonWithDue("pkg1", "2026-10-10T19:28:47+03:30") + "],\"count\":1}");
         PackageListOptions options = newPackageListOptions()
-                .withStatus(PackageStatus.SENT)
+                .withStatus(PackageStatus.SENT.name())
                 .withDateRange(Date.from(Instant.parse("2026-10-01T10:00:00Z")), null)
                 .withTransactionTimezone()
                 .build();
@@ -894,6 +894,15 @@ public class PackageServiceTest {
         packageService.getPackages(PackageStatus.SENT.name(), new PageRequest(1, 5));
 
         verify(clientMock).get("http://baseurl/packages?query=SENT&from=1&to=5");
+    }
+
+    @Test
+    public void testGetPackagesWithOptionsSendsSameStatusAsDeprecatedGetPackages() throws Exception {
+        when(clientMock.get(anyString())).thenReturn("{\"results\":[],\"count\":0}");
+
+        packageService.getPackagesWithOptions(new PageRequest(1, 5), newPackageListOptions().withStatus("inbox").build());
+
+        verifyGetUrlIgnoringParamOrder("http://baseurl/packages?query=inbox&from=1&to=5");
     }
 
     @Test

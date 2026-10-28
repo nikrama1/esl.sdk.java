@@ -67,7 +67,7 @@ public class GetPackageInTransactionTimezoneExample extends SDKSample {
 
         // The same option applies to a page of packages
         PackageListOptions listOptions = newPackageListOptions()
-                .withStatus(PackageStatus.DRAFT)
+                .withStatus(PackageStatus.DRAFT.name())
                 .withDateRange(createdFrom, now().plusMinutes(1).toDate())
                 .withTransactionTimezone()
                 .build();

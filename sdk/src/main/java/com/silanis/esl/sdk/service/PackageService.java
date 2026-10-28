@@ -1249,8 +1249,7 @@ public class PackageService extends EslComponent {
                 .addParam("to", Integer.toString(request.to()));
         if (options != null) {
             urlTemplate.addParam("type", options.isTemplates() ? "template" : null)
-                    .addParam("query", options.getStatus() == null ? null
-                            : toQueryParamValue(new PackageStatusConverter(options.getStatus()).toAPIPackageStatus()))
+                    .addParam("query", toQueryParamValue(options.getStatus()))
                     .addParam("visibility", options.getVisibility() == null ? null : toQueryParamValue(options.getVisibility().name()))
                     .addParam("startDate", toQueryParamValue(options.getStartDate()))
                     .addParam("endDate", toQueryParamValue(options.getEndDate()))

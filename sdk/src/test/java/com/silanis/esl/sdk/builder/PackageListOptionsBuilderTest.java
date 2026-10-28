@@ -1,7 +1,6 @@
 package com.silanis.esl.sdk.builder;
 
 import com.silanis.esl.sdk.PackageListOptions;
-import com.silanis.esl.sdk.PackageStatus;
 import com.silanis.esl.sdk.Visibility;
 import org.junit.Test;
 
@@ -32,14 +31,14 @@ public class PackageListOptionsBuilderTest {
 
         PackageListOptions options = newPackageListOptions()
                 .forTemplates()
-                .withStatus(PackageStatus.SENT)
+                .withStatus("inbox")
                 .withVisibility(Visibility.ACCOUNT)
                 .withDateRange(start, end)
                 .withTransactionTimezone()
                 .build();
 
         assertTrue(options.isTemplates());
-        assertEquals(PackageStatus.SENT, options.getStatus());
+        assertEquals("inbox", options.getStatus());
         assertEquals(Visibility.ACCOUNT, options.getVisibility());
         assertEquals(start, options.getStartDate());
         assertEquals(end, options.getEndDate());

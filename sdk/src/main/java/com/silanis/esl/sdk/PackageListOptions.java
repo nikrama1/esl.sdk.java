@@ -15,7 +15,7 @@ import java.util.Date;
 public class PackageListOptions {
 
     private boolean templates;
-    private PackageStatus status;
+    private String status;
     private Visibility visibility;
     private Date startDate;
     private Date endDate;
@@ -34,12 +34,14 @@ public class PackageListOptions {
 
     /**
      * Ignored when listing templates.
+     *
+     * @see com.silanis.esl.sdk.builder.PackageListOptionsBuilder#withStatus(String)
      */
-    public PackageStatus getStatus() {
+    public String getStatus() {
         return status;
     }
 
-    public void setStatus(PackageStatus status) {
+    public void setStatus(String status) {
         this.status = status;
     }
 
