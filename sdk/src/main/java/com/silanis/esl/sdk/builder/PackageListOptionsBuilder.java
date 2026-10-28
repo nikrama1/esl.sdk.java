@@ -71,6 +71,9 @@ public class PackageListOptionsBuilder {
     /**
      * Lists only the packages whose update date is within the range. Both dates are included and either may be null
      * for an open range.
+     * <p>
+     * The server compares whole days in UTC: the start date counts from the beginning of its UTC day and the end
+     * date up to the end of its UTC day, so the time of day is ignored.
      *
      * @return This
      */
